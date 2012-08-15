@@ -1,0 +1,166 @@
+    _ (`-.  ('-. .-.   ('-.         .-') _  .-') _             _   .-')    
+   ( (OO  )( OO )  /  ( OO ).-.    ( OO ) )(  OO) )           ( '.( OO )_  
+  _.`     \,--. ,--.  / . --. /,--./ ,--,' /     '._   .----.  ,--.   ,--.)
+(__...--''|  | |  |  | \-.  \ |   \ |  |\ |'--...__) /  ..  \ |   `.'   | 
+ |  /  | ||   .|  |.-'-'  |  ||    \|  | )'--.  .--'.  /  \  .|         | 
+ |  |_.' ||       | \| |_.'  ||  .     |/    |  |   |  |  '  ||  |'.'|  | 
+ |  .___.'|  .-.  |  |  .-.  ||  |\    |     |  |   '  \  /  '|  |   |  | 
+ |  |     |  | |  |  |  | |  ||  | \   |     |  |    \  `'  / |  |   |  |   
+ `--'     `--' `--'  `--' `--'`--'  `--'     `--'     `---''  `--'   `--' 
+ 
+An ASM ghostwriting script PoC for linux.
+Brought to you by Shadow-Master  @Shadow-Master #offtopicsec on freenode server
+Thanks to trillian_ on #offsec for some regex help
+Thanks to bwall, kamsky, lucidnight, PuN1sh3r and others on #offtopicsec for help as well
+
+Explanation of the script
+--------------------------------------------
+While reading a blog post about ASM ghostwriting, I decided to make my own automator.
+While most scripts basically do a static search and replace within the ASM code, and
+while I also plan on including similiar functionality, I chose to take a different 
+route for my main obfuscation engine.
+
+What I've noticed from my forays into Shellcode land was that people don't actually
+care about how things happen. They care about two things: 1) the size of the code,
+and 2) what the registers and stack look like after the code has run before the 
+syscall is made. I do not include the null byte consideration, since if null bytes
+are in shellcode it will not run. Meaning that while sometimes we need null bytes
+in the actual code, we cannot use null bytes to get there or the code will fail.
+
+Well, I actually do not care about the size of the shellcode. Sorry. In fact, in
+my mind, the larger and more obfuscated the code is, the better. In a nutshell, the
+current release of the script is a parser. The goal is to have the exact state of 
+the registers and the stack before the syscall saved in a frame file for later
+obfuscation. When the frame state is reached, the next major update of the script
+will have some sort of ASM generator to create null-byte clean ASM code to reach
+that state.
+
+As of now the script will handle without issues the following commands:
+	ADD
+	SUB
+	INC
+	DEC
+	MOV
+	XOR
+	OR
+	AND
+	CDQ
+	PUSH  
+	POP
+	XCHG
+	LEA
+	INT 0x80 (for *SOME* syscalls...)
+	
+Also, I now handle:
+	JMP
+	JZ
+	JNZ
+	JE
+	JNE
+	JS
+	JNS
+	TEST
+	CMP
+with a few caviats. Dereferenced values will not produce flag changes. That
+is a direct result of how my deref sub handles its values. I may change that
+in the future, but for now, it will remain like this. Also I do not jump to 
+absolute locations. JMP 0x40 will spectacularly crash my script. You must
+have included a label in the .s file for this to work. That's why this won't
+work in -i mode.
+
+Also:
+	CALL
+is still iffy, because i would have to process things below that to use it well..
+
+I still do not handle:
+	JLE
+	JGE
+	JG
+	JL
+because I have yet to truly understand how to use the overflow flag, and how to
+integrate into my script.
+	
+It will *NOT* handle these:
+	IMUL
+	MUL
+	SHR
+	SHL
+	ROTL
+	ROTR
+I chose not to handle these because they are not used in most shellcode.
+If it turns out that people want them, I, or someone else, will add them in.
+
+
+
+This code will handle dereferencing as well *ONLY* in the first operand.
+Examples:
+	LEA EBX, ESP
+	MOV [EBX +3], AX
+will be fine. As long as the stack value has already been pushed, that is.
+Unlike real stacks, my stack is an array, and can therefore not handle values
+that have not been pushed. My advice is to push 0xffffffff in the test code
+and not in the real code.
+
+However
+	MOV EAX, [EBX +3]
+Will fail miserably...
+
+Within the ASM file, the standard asm comment delimiter ; is used. It can be
+there or not, my code doesn't care, but anything after a ; is ignored.
+
+To force a status output during the shellcode parsing, which can be useful,
+just a line saying ;status in the file where you want the output.
+	
+
+Usage modes
+--------------------------------------------
+-c|--createframe
+	This will parse an ASM file according to the guidelines above.
+	
+-r|--readframe
+	This will read in a framefile and show status output. Used for 
+	debugging the manual creation of framefiles, or just to look cool.
+	
+-i|--interactive
+	This will drop to an ASM shell where the commands you entered in will
+	be parsed as you enter them. Do not make typos, since this will not check.
+	Type ;status to force a status check, and int 0x80 to force a frame save.
+	This will not handle loops or jmp's.
+	
+	*DO NOT TYPE IN ANYTHING OTHER THAN WORDS! ARROWS KEYS AND SUCH WILL CRASH THE SCRIPT!*
+	
+
+-l|--linebyline    *NOT IMPLEMENTED YET*
+	This will read in an ASM file and do a static line-by-line replacement
+	from community supplied replacement modules. When I fully implement this,
+	I will explain the rules for modules, and provide examples.
+	
+-g|--generatecode    *NOT IMPLEMENTED YET*
+	The main point of the script. When pointed to the first framefile, it will
+	read in the state, and generate (hopefully) null-byte safe ASM code to reach
+	an equivilant state. Since the code will be generated based on a random set
+	of heuristics, the code will almost never be repeated. This will be the
+	hardest thing to write, but also the most interesting. This is where the help
+	from the community is truly needed.
+	
+-v|--verbose
+	Up to three of these flags can be added to the command line, increasing the 
+	verbosity level with each addition. The output goes from almost nothing to 
+	completely over-whelming.
+	
+-h|--help
+	Basically this.
+
+Usage examples
+---------------------------------------------
+I have provided several ASM files to play around with. On the assumption that those
+will be used for right now, here are some examples.
+
+./Gh0stWr1ter.pl -c clean_bind_shell.s -v -v -v
+Creates a framefile based on the ASM code in clean_bind_shell.s, and prints all output to screen.
+
+./Gh0stWr1ter.pl -r frames/0.frm -v
+Read in the framefile and print it to screen, being slightly verbose.
+
+./Gh0stWr1ter.pl -i
+Enter interactive mode to create framefiles.
